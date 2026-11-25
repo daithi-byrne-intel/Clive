@@ -1,0 +1,75 @@
+{
+  "controlPlacements": [
+    {
+      "controlName": "CombinedLevelsViewer.Extension.OpenCombinedLevelsViewerCommand",
+      "parent": {
+        "legacyParentId": {
+          "guid": "d309f791-903f-11d0-9efc-00a0c911004f",
+          "id": 24576
+        },
+        "priority": 0
+      }
+    }
+  ],
+  "toolWindows": [
+    {
+      "identifier": "CombinedLevelsViewer.Extension.CombinedLevelsSourceToolWindow",
+      "placement": "DocumentWell",
+      "dockDirection": "Right",
+      "allowAutoCreation": false,
+      "serviceMoniker": "CombinedLevelsViewer.Extension.GeneratedToolWindowProvider;1.0"
+    },
+    {
+      "identifier": "CombinedLevelsViewer.Extension.CombinedLevelsToolWindow",
+      "placement": "DocumentWell",
+      "dockDirection": "Right",
+      "allowAutoCreation": false,
+      "serviceMoniker": "CombinedLevelsViewer.Extension.GeneratedToolWindowProvider;1.0"
+    }
+  ],
+  "commandSets": [
+    {
+      "name": "CombinedLevelsViewer.Extension.ExtensionEntrypoint",
+      "serviceMoniker": {
+        "name": "CombinedLevelsViewer.Extension.ExtensionEntrypointCommandSet",
+        "version": "1.0"
+      },
+      "commands": [
+        {
+          "tooltipText": "%OpenCombinedLevelsViewer.Tooltip%",
+          "flags": "None",
+          "name": "CombinedLevelsViewer.Extension.OpenCombinedLevelsViewerCommand",
+          "displayName": "%OpenCombinedLevelsViewer.DisplayName%",
+          "contextProviderName": "Editor,Shell"
+        }
+      ],
+      "dynamicCommandAnchors": []
+    }
+  ],
+  "services": [
+    {
+      "host": "dotnetExtensibility",
+      "name": "CombinedLevelsViewer.Extension.ExtensionEntrypointCommandSet",
+      "serviceBaseDirectory": ".",
+      "serviceAudience": "Local | RemoteExclusiveClient",
+      "version": "1.0",
+      "entryPoint": {
+        "assemblyPath": "CombinedLevelsViewer.Extension.dll",
+        "fullClassName": "CombinedLevelsViewer.Extension.ExtensionEntrypoint"
+      },
+      "allowHostingInProcess": false
+    },
+    {
+      "host": "dotnetExtensibility",
+      "name": "CombinedLevelsViewer.Extension.GeneratedToolWindowProvider",
+      "serviceBaseDirectory": ".",
+      "serviceAudience": "Local | RemoteExclusiveClient",
+      "version": "1.0",
+      "entryPoint": {
+        "assemblyPath": "CombinedLevelsViewer.Extension.dll",
+        "fullClassName": "CombinedLevelsViewer.Extension.ExtensionEntrypoint"
+      },
+      "allowHostingInProcess": false
+    }
+  ]
+}

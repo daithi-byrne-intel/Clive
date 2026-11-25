@@ -1,0 +1,39 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\CombinedLevelsViewer.Core\CombinedLevelsViewer.Core.csproj" />
+    <PackageReference Include="Microsoft.VisualStudio.Extensibility.Sdk" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.VSSDK.BuildTools" PrivateAssets="all" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <Version>0.1.5</Version>
+    <AssemblyVersion>0.1.5.0</AssemblyVersion>
+    <FileVersion>0.1.5.0</FileVersion>
+    <CreateVsixContainer>true</CreateVsixContainer>
+    <DeployExtension>false</DeployExtension>
+    <IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>
+    <IncludeDebugSymbolsInVSIXContainer>false</IncludeDebugSymbolsInVSIXContainer>
+    <IncludePkgdefInVSIXContainer>false</IncludePkgdefInVSIXContainer>
+    <VsixIntermediateDirectory>$(MSBuildProjectDirectory)\obj\$(Configuration)\$(TargetFramework)\</VsixIntermediateDirectory>
+    <IntermediateVsixManifest>$(VsixIntermediateDirectory)extension.vsixmanifest</IntermediateVsixManifest>
+    <FileManifest>$(VsixIntermediateDirectory)files.json</FileManifest>
+    <TemplateOutputDirectory>$(VsixIntermediateDirectory)</TemplateOutputDirectory>
+    <CreateTemplateManifestsCacheFile>$(VsixIntermediateDirectory)createTemplateManifests.cache</CreateTemplateManifestsCacheFile>
+    <VsSDKToolsPath>$(NuGetPackageRoot)\microsoft.vssdk.buildtools\17.14.2142\tools\vssdk\bin</VsSDKToolsPath>
+    <TargetVsixContainer>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\CombinedLevelsViewer.Extension.vsix</TargetVsixContainer>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <VSIXSourceItem Include="$(IntermediateOutputPath)extension.json" TargetPath="extension.json" />
+    <VSIXSourceItem Include="string-resources.json" TargetPath="string-resources.json" />
+  </ItemGroup>
+
+  <Target Name="BuildVsixContainer" AfterTargets="Build" DependsOnTargets="CreateVsixContainer" />
+
+  <Import Project="$(NuGetPackageRoot)\microsoft.vssdk.buildtools\17.14.2142\tools\vssdk\Microsoft.VsSDK.targets" />
+</Project>

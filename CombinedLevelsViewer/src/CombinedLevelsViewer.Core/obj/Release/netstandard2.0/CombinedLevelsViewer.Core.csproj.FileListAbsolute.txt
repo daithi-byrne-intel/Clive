@@ -1,0 +1,10 @@
+C:\Users\jessiehe\source\repos\WW47_512_1\CombinedLevelsViewer\src\CombinedLevelsViewer.Core\bin\Release\netstandard2.0\CombinedLevelsViewer.Core.deps.json
+C:\Users\jessiehe\source\repos\WW47_512_1\CombinedLevelsViewer\src\CombinedLevelsViewer.Core\bin\Release\netstandard2.0\CombinedLevelsViewer.Core.dll
+C:\Users\jessiehe\source\repos\WW47_512_1\CombinedLevelsViewer\src\CombinedLevelsViewer.Core\bin\Release\netstandard2.0\CombinedLevelsViewer.Core.pdb
+C:\Users\jessiehe\source\repos\WW47_512_1\CombinedLevelsViewer\src\CombinedLevelsViewer.Core\obj\Release\netstandard2.0\CombinedLevelsViewer.Core.csproj.AssemblyReference.cache
+C:\Users\jessiehe\source\repos\WW47_512_1\CombinedLevelsViewer\src\CombinedLevelsViewer.Core\obj\Release\netstandard2.0\CombinedLevelsViewer.Core.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\jessiehe\source\repos\WW47_512_1\CombinedLevelsViewer\src\CombinedLevelsViewer.Core\obj\Release\netstandard2.0\CombinedLevelsViewer.Core.AssemblyInfoInputs.cache
+C:\Users\jessiehe\source\repos\WW47_512_1\CombinedLevelsViewer\src\CombinedLevelsViewer.Core\obj\Release\netstandard2.0\CombinedLevelsViewer.Core.AssemblyInfo.cs
+C:\Users\jessiehe\source\repos\WW47_512_1\CombinedLevelsViewer\src\CombinedLevelsViewer.Core\obj\Release\netstandard2.0\CombinedLevelsViewer.Core.csproj.CoreCompileInputs.cache
+C:\Users\jessiehe\source\repos\WW47_512_1\CombinedLevelsViewer\src\CombinedLevelsViewer.Core\obj\Release\netstandard2.0\CombinedLevelsViewer.Core.dll
+C:\Users\jessiehe\source\repos\WW47_512_1\CombinedLevelsViewer\src\CombinedLevelsViewer.Core\obj\Release\netstandard2.0\CombinedLevelsViewer.Core.pdb
