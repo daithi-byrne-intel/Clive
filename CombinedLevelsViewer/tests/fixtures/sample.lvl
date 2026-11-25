@@ -1,0 +1,15 @@
+Version 1.0;
+
+Levels SAMPLE_LEVEL
+{
+	all_pins
+	{
+		OPMode = "VSIM";
+		VForce = p_voltage;
+	}
+	SequenceBreak 1mS;
+	supply
+	{
+		PowerSequence = TRUE;
+	}
+}

@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CombinedLevelsViewer.Core/CombinedLevelsViewer.Core.csproj" />
+    <Project Path="src/CombinedLevelsViewer.Extension/CombinedLevelsViewer.Extension.csproj" />
+    <Project Path="src/CombinedLevelsViewer.TorchTabular/CombinedLevelsViewer.TorchTabular.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CombinedLevelsViewer.Core.Tests/CombinedLevelsViewer.Core.Tests.csproj" />
+  </Folder>
+</Solution>

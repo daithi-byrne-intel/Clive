@@ -1,0 +1,11 @@
+<Project>
+  <PropertyGroup>
+	<ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+	<PackageVersion Include="Microsoft.VisualStudio.Extensibility.Sdk" Version="17.14.40608" />
+	<PackageVersion Include="Microsoft.VSSDK.BuildTools" Version="17.14.2142" />
+	<PackageVersion Include="Microsoft.Web.WebView2" Version="1.0.2592.51" />
+	<PackageVersion Include="MSTest" Version="4.0.2" />
+  </ItemGroup>
+</Project>

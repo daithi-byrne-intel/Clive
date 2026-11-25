@@ -1,0 +1,18 @@
+Version 1.0;
+
+SpecificationSet SAMPLE_SPECS (low,nominal)
+{
+	Voltage p_voltage = 0.7V,0.8V;
+}
+
+TestConditionGroup SAMPLE_TCG
+{
+	SpecificationSet = SAMPLE_SPECS;
+	Level = __main__::SAMPLE_LEVEL;
+}
+
+TestCondition SAMPLE_LOW
+{
+	TestConditionGroup = SAMPLE_TCG;
+	Selector = low;
+}

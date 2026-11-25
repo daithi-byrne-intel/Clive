@@ -1,0 +1,21 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011">
+  <Metadata>
+    <Identity Id="Intel.CombinedLevelsViewer" Version="1.0.0.0" Language="en-US" Publisher="Intel" />
+    <DisplayName>Combined Levels Viewer</DisplayName>
+    <Description>A synchronized tabular and source viewer for Torch level and test-condition files.</Description>
+    <Preview>true</Preview>
+  </Metadata>
+  <Installation ExtensionType="VisualStudio.Extensibility">
+    <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.14,)">
+      <ProductArchitecture>amd64</ProductArchitecture>
+    </InstallationTarget>
+    <InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[17.14,)">
+      <ProductArchitecture>arm64</ProductArchitecture>
+    </InstallationTarget>
+    <DotnetTargetVersions>net8.0</DotnetTargetVersions>
+  </Installation>
+  <Prerequisites>
+    <Prerequisite Id="Microsoft.VisualStudio.Component.CoreEditor" Version="[17.14,)" DisplayName="Visual Studio core editor" />
+  </Prerequisites>
+</PackageManifest>
