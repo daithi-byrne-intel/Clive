@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+	<OutputType>WinExe</OutputType>
+	<TargetFramework>net8.0-windows</TargetFramework>
+	<UseWPF>true</UseWPF>
+	<ImplicitUsings>enable</ImplicitUsings>
+	<Nullable>enable</Nullable>
+	<LangVersion>latest</LangVersion>
+	<RootNamespace>CombinedLevelsViewer.TorchTabular</RootNamespace>
+	<!-- The application is called Clive (Combined Levels Viewer); the executable is Clive.exe. -->
+	<AssemblyName>Clive</AssemblyName>
+	<Product>Clive</Product>
+	<AssemblyTitle>Clive</AssemblyTitle>
+	<Description>Clive - Combined Levels Viewer</Description>
+	<!-- Raise this for every package that is handed out, so people can tell which one they have. -->
+	<Version>1.0.1</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+	<ProjectReference Include="..\CombinedLevelsViewer.Core\CombinedLevelsViewer.Core.csproj" />
+	<PackageReference Include="Microsoft.Web.WebView2" />
+  </ItemGroup>
+
+  <!-- The LevelsComponents folder mirrors the layout of Torch's Web\Html component folders
+	   (TorchTabularComponents, DFFComponents) so it can be dropped into Torch unchanged. -->
+  <ItemGroup>
+	<Content Include="Web\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
