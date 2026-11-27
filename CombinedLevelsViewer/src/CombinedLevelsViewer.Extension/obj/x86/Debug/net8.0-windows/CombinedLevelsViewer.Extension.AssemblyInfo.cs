@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("CombinedLevelsViewer.Extension")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("0.1.5.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.1.5+a761e1edb9376258072c8eaaf935482085370ae9")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.1.5+827ae829ecd4f091e191f7062eb0966fcb8ae6e3")]
 [assembly: System.Reflection.AssemblyProductAttribute("CombinedLevelsViewer.Extension")]
 [assembly: System.Reflection.AssemblyTitleAttribute("CombinedLevelsViewer.Extension")]
 [assembly: System.Reflection.AssemblyVersionAttribute("0.1.5.0")]

@@ -8,7 +8,13 @@
 	<Nullable>enable</Nullable>
 	<LangVersion>latest</LangVersion>
 	<RootNamespace>CombinedLevelsViewer.TorchTabular</RootNamespace>
-	<AssemblyName>CombinedLevelsViewer.TorchTabular</AssemblyName>
+	<!-- The application is called Clive (Combined Levels Viewer); the executable is Clive.exe. -->
+	<AssemblyName>Clive</AssemblyName>
+	<Product>Clive</Product>
+	<AssemblyTitle>Clive</AssemblyTitle>
+	<Description>Clive - Combined Levels Viewer</Description>
+	<!-- Raise this for every package that is handed out, so people can tell which one they have. -->
+	<Version>1.0.1</Version>
   </PropertyGroup>
 
   <ItemGroup>

@@ -20,13 +20,13 @@ Adding the projects to the solution does not load the extension into the current
 
 ## Torch tabular grid prototype
 
-`CombinedLevelsViewer.TorchTabular` shows the same level tables in the tabular grid that ships with the Torch extension, without needing the VSIX. It is a prototype for building a levels view into Torch itself.
+The application is called **Clive** (Combined Levels Viewer); its executable is `Clive.exe`. The project `CombinedLevelsViewer.TorchTabular` shows the same level tables in the tabular grid that ships with the Torch extension, without needing the VSIX. It is a prototype for building a levels view into Torch itself.
 
 Run it from the repository root:
 
 `dotnet run --project CombinedLevelsViewer\src\CombinedLevelsViewer.TorchTabular -c Release`
 
-or pass the repository root as the first argument to `CombinedLevelsViewer.TorchTabular.exe`. Pick a level set on the left; double-click a cell to edit it; **Save** writes both files.
+or pass the repository root as the first argument to `Clive.exe`. Pick a level set on the left; double-click a cell to edit it; **Save** writes both files.
 
 The first argument can also be the path of `LevelsSequences.lvl` or `BaseLevels.tcg`, so the viewer can be registered in Visual Studio under **Open With > Add** for those files. Either file opens the same paired view.
 
@@ -46,9 +46,16 @@ Level sets and their selectors:
   - a parameter is followed through the specification set to the entry that holds a literal, and that entry is changed in `BaseLevels.tcg`. When the value lists one entry per selector, only the entry of the selected selector changes; when it holds a single value, the change applies to every selector, and the status bar says so.
   - Because the edit changes the parameter, every level and row that uses the same parameter in that specification set changes with it.
   - Values calculated by a formula or taken from a uservar cannot be set from the table; the tooltip and the status bar give the reason.
+- To edit a cell, double-click it (or select it and press Enter or start typing), change the value and press Enter. You do not have to press Enter or click elsewhere before saving: **Save**, closing the window and selecting another level set or test condition all apply a value that is still being typed. If that value is not valid, nothing is saved (or the window stays open) and the status bar says why.
 - A name is looked up in the specification set of the linked test-condition group first, then in the uservars. A specification value that lists one entry per selector yields the entry for the selected selector. Formulas using `+ - * /` and parentheses are calculated, with prefixed units (`mV`, `uA`, `mS`) converted to base units. Literals and values taken straight from a definition keep their spelling (`4.00A`, `500mA`).
 - Names must match exactly (case-sensitive, never partial). A cell whose parameter has no exact definition keeps its expression and is shown in red; the status bar reports how many references in the whole file resolve.
 - `PowerDomain` is left as written: its value is the name of a power domain from the pin definitions, not a parameter.
+
+Duplicates:
+
+- A level set is highlighted in light yellow when another level set produces the same values: either both have the same selectors with identical values, or every selector of one exists in the other with identical values. A test condition is highlighted when another test condition (in any level set) resolves to an identical table.
+- The comparison is on resolved values for every cell, with prefixed units normalised (`800mV` equals `0.8V`). It reflects the values currently in the three files.
+- The tooltip lists the duplicates. Right-click a highlighted node and choose **Compare with duplicates...** to open a side-by-side table: selector, resource, property, the value on each side and the chain of definitions each side uses. Values that are equal but reached through different definitions (for example two uservars that both hold `40A`) are highlighted there, because they would diverge if one definition changed.
 
 Clamps pulled in from the uservars:
 
@@ -64,6 +71,17 @@ Limits of the prototype:
 - Only cells that already have a value in the `.lvl` file can be edited. An edit that would make the file unparsable is rejected.
 - The test-condition context panel is read-only.
 - `--selftest <file>` renders the first level, pushes one unsaved edit through the grid, writes what the grid showed to `<file>` and exits.
+
+## Package for other people
+
+`installer\Build-Package.ps1` builds a folder and a zip that anyone can install from, with no .NET or build tools needed:
+
+`powershell -ExecutionPolicy Bypass -File CombinedLevelsViewer\installer\Build-Package.ps1`
+
+- Output: `dist\Clive-Setup\` and `dist\Clive-Setup.zip` (git-ignored, about 160 MB / 67 MB).
+- Contents: the viewer (`app`, self-contained for 64-bit Windows), `Install.cmd`, `Uninstall.cmd` and `README.txt`.
+- `Install.cmd` installs for the current user without administrator rights and adds **Open in Clive** to the File Explorer right-click menu of `.lvl` and `.tcg` files. `README.txt` has the steps for adding the viewer to **Open With** in Visual Studio.
+- The package does not contain Torch's grid; each user needs the Torch extension installed.
 
 ## Tests
 

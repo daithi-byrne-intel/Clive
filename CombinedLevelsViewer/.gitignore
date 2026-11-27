@@ -1,0 +1,2 @@
+# Built package (see installer\Build-Package.ps1); about 160 MB, not for source control.
+dist/

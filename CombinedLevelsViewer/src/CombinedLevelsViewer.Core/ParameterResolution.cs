@@ -228,6 +228,25 @@ public sealed class ParameterResolver
         return ParameterEditTarget.NotEditable("'" + text + "' refers back to itself.");
     }
 
+    /// <summary>
+    /// Writes a value in base units so that equal quantities compare equal (800mV and 0.8V both give 0.8V).
+    /// Text that is not a number is returned unchanged.
+    /// </summary>
+    public static string NormalizeValue(string text)
+    {
+        var trimmed = (text ?? string.Empty).Trim();
+        if (trimmed.Length == 0 || ContainsName(trimmed)) return trimmed;
+        try
+        {
+            var value = new ExpressionParser(trimmed, name => throw new EvaluationException("Not a number.")).Parse();
+            return value.IsNumber ? value.Number.ToString("G10", CultureInfo.InvariantCulture) + value.Unit : trimmed;
+        }
+        catch (EvaluationException)
+        {
+            return trimmed;
+        }
+    }
+
     /// <summary>True when the expression refers to at least one name (TRUE and FALSE are literals).</summary>
     private static bool ContainsName(string expression)
     {

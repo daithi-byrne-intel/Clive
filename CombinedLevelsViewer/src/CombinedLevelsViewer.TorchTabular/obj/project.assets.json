@@ -54,6 +54,49 @@
           "bin/placeholder/CombinedLevelsViewer.Core.dll": {}
         }
       }
+    },
+    "net8.0-windows/win-x64": {
+      "Microsoft.Web.WebView2/1.0.2592.51": {
+        "type": "package",
+        "compile": {
+          "lib/netcoreapp3.0/Microsoft.Web.WebView2.Core.dll": {
+            "related": ".xml"
+          },
+          "lib/netcoreapp3.0/Microsoft.Web.WebView2.WinForms.dll": {
+            "related": ".xml"
+          },
+          "lib/netcoreapp3.0/Microsoft.Web.WebView2.Wpf.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/netcoreapp3.0/Microsoft.Web.WebView2.Core.dll": {
+            "related": ".xml"
+          },
+          "lib/netcoreapp3.0/Microsoft.Web.WebView2.WinForms.dll": {
+            "related": ".xml"
+          },
+          "lib/netcoreapp3.0/Microsoft.Web.WebView2.Wpf.dll": {
+            "related": ".xml"
+          }
+        },
+        "native": {
+          "runtimes/win-x64/native/WebView2Loader.dll": {}
+        },
+        "build": {
+          "build/Microsoft.Web.WebView2.targets": {}
+        }
+      },
+      "CombinedLevelsViewer.Core/1.0.0": {
+        "type": "project",
+        "framework": ".NETStandard,Version=v2.0",
+        "compile": {
+          "bin/placeholder/CombinedLevelsViewer.Core.dll": {}
+        },
+        "runtime": {
+          "bin/placeholder/CombinedLevelsViewer.Core.dll": {}
+        }
+      }
     }
   },
   "libraries": {
@@ -166,10 +209,10 @@
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
-    "version": "1.0.0",
+    "version": "1.0.1",
     "restore": {
       "projectUniqueName": "C:\\Users\\jessiehe\\source\\repos\\WW47_512_1\\CombinedLevelsViewer\\src\\CombinedLevelsViewer.TorchTabular\\CombinedLevelsViewer.TorchTabular.csproj",
-      "projectName": "CombinedLevelsViewer.TorchTabular",
+      "projectName": "Clive",
       "projectPath": "C:\\Users\\jessiehe\\source\\repos\\WW47_512_1\\CombinedLevelsViewer\\src\\CombinedLevelsViewer.TorchTabular\\CombinedLevelsViewer.TorchTabular.csproj",
       "packagesPath": "C:\\Users\\jessiehe\\source\\repos\\WW47_512_1\\temp\\packages",
       "outputPath": "C:\\Users\\jessiehe\\source\\repos\\WW47_512_1\\CombinedLevelsViewer\\src\\CombinedLevelsViewer.TorchTabular\\obj\\",
@@ -246,6 +289,20 @@
         ],
         "assetTargetFallback": true,
         "warn": true,
+        "downloadDependencies": [
+          {
+            "name": "Microsoft.AspNetCore.App.Runtime.win-x64",
+            "version": "[8.0.29, 8.0.29]"
+          },
+          {
+            "name": "Microsoft.NETCore.App.Runtime.win-x64",
+            "version": "[8.0.29, 8.0.29]"
+          },
+          {
+            "name": "Microsoft.WindowsDesktop.App.Runtime.win-x64",
+            "version": "[8.0.29, 8.0.29]"
+          }
+        ],
         "frameworkReferences": {
           "Microsoft.NETCore.App": {
             "privateAssets": "all"
@@ -255,6 +312,11 @@
           }
         },
         "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json"
+      }
+    },
+    "runtimes": {
+      "win-x64": {
+        "#import": []
       }
     }
   }

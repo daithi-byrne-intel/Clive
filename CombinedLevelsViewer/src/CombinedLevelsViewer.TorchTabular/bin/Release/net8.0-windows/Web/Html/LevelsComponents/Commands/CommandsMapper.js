@@ -1,4 +1,5 @@
 import FillGridCommand from "./FillGridCommand.js";
+import CommitEditCommand from "./CommitEditCommand.js";
 import CommandNameConsts from "./CommandNameConsts.js";
 import CellEditHandler from "../../BaseComponents/Services/CellEditHandler.js";
 
@@ -10,6 +11,7 @@ class CommandsMapper {
 
     SetCommands(mapping) {
         mapping.set(CommandNameConsts.FillGridCommand, this.createFillGridCommand());
+        mapping.set(CommandNameConsts.CommitEditCommand, new CommitEditCommand(this.eventSender));
     }
 
     createFillGridCommand() {
@@ -18,7 +20,7 @@ class CommandsMapper {
         const gridOptionsExtenders = [
             new CellEditHandler(this.eventSender, this.columnDefHelper)
         ];
-        return new FillGridCommand(this.columnDefHelper, gridOptionsExtenders);
+        return new FillGridCommand(this.columnDefHelper, gridOptionsExtenders, this.eventSender);
     }
 }
 

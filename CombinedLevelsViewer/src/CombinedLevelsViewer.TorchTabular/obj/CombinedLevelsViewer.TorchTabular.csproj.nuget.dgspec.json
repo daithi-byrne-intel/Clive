@@ -84,13 +84,18 @@
           "warn": true,
           "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302\\RuntimeIdentifierGraph.json"
         }
+      },
+      "runtimes": {
+        "win-x64": {
+          "#import": []
+        }
       }
     },
     "C:\\Users\\jessiehe\\source\\repos\\WW47_512_1\\CombinedLevelsViewer\\src\\CombinedLevelsViewer.TorchTabular\\CombinedLevelsViewer.TorchTabular.csproj": {
-      "version": "1.0.0",
+      "version": "1.0.1",
       "restore": {
         "projectUniqueName": "C:\\Users\\jessiehe\\source\\repos\\WW47_512_1\\CombinedLevelsViewer\\src\\CombinedLevelsViewer.TorchTabular\\CombinedLevelsViewer.TorchTabular.csproj",
-        "projectName": "CombinedLevelsViewer.TorchTabular",
+        "projectName": "Clive",
         "projectPath": "C:\\Users\\jessiehe\\source\\repos\\WW47_512_1\\CombinedLevelsViewer\\src\\CombinedLevelsViewer.TorchTabular\\CombinedLevelsViewer.TorchTabular.csproj",
         "packagesPath": "C:\\Users\\jessiehe\\source\\repos\\WW47_512_1\\temp\\packages",
         "outputPath": "C:\\Users\\jessiehe\\source\\repos\\WW47_512_1\\CombinedLevelsViewer\\src\\CombinedLevelsViewer.TorchTabular\\obj\\",
@@ -167,6 +172,20 @@
           ],
           "assetTargetFallback": true,
           "warn": true,
+          "downloadDependencies": [
+            {
+              "name": "Microsoft.AspNetCore.App.Runtime.win-x64",
+              "version": "[8.0.29, 8.0.29]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Runtime.win-x64",
+              "version": "[8.0.29, 8.0.29]"
+            },
+            {
+              "name": "Microsoft.WindowsDesktop.App.Runtime.win-x64",
+              "version": "[8.0.29, 8.0.29]"
+            }
+          ],
           "frameworkReferences": {
             "Microsoft.NETCore.App": {
               "privateAssets": "all"
@@ -176,6 +195,11 @@
             }
           },
           "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json"
+        }
+      },
+      "runtimes": {
+        "win-x64": {
+          "#import": []
         }
       }
     }

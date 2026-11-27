@@ -31,6 +31,10 @@ public partial class MainWindow : Window
     private TorchGridBridge? bridge;
     private UserVarsDocument userVars = UserVarsDocument.Empty;
     private ParameterResolver resolver = new(UserVarsDocument.Empty);
+    private DuplicateAnalysis duplicates = DuplicateAnalysis.Empty;
+    private UserVarsDocument? analysedUserVars;
+    private long analysedRevision = -1;
+    private string resolutionSummary = string.Empty;
     private string? userVarsPath;
     private string? userVarsProblem;
     private bool gridReady;
@@ -38,6 +42,10 @@ public partial class MainWindow : Window
     private bool selfTesting;
     private bool selfTestSave;
     private string? editNote;
+    private TaskCompletionSource<bool>? pendingCommit;
+    private string? pendingCommitToken;
+    private string? rejectedEdit;
+    private bool closeAfterCommit;
     private LevelNode? selectedNode;
     private LevelNode? displayedNode;
     private string displayedShape = string.Empty;
@@ -68,7 +76,7 @@ public partial class MainWindow : Window
             service.SnapshotChanged += (_, args) => Dispatcher.InvokeAsync(() => RefreshLevels(args.Snapshot));
             service.ExternalChangeDetected += (_, args) => Dispatcher.InvokeAsync(
                 () => SetStatus(Path.GetFileName(args.Path) + " changed on disk. Use Reload from disk to pick up the change."));
-            Title = "Combined Levels Viewer (Torch tabular grid) - " + root;
+            Title = "Clive - " + root;
             userVarsPath = RepositoryLocator.UserVarsPath(root);
             LoadUserVars();
 
@@ -108,6 +116,16 @@ public partial class MainWindow : Window
     private void RefreshLevels(PairedDocumentSnapshot snapshot)
     {
         resolver = new ParameterResolver(userVars);
+        if (analysedRevision != snapshot.Revision || !ReferenceEquals(analysedUserVars, userVars))
+        {
+            // Whole-file checks are only redone when the text or the uservars changed, not on every filter keystroke.
+            duplicates = DuplicateAnalysis.Analyze(snapshot.LastValidModel, userVars);
+            resolutionSummary = DescribeResolution(snapshot);
+            analysedRevision = snapshot.Revision;
+            analysedUserVars = userVars;
+        }
+
+        var duplicateLevels = 0;
         var preferredKey = selectedNode?.Key;
         var filter = FilterBox.Text.Trim();
 
@@ -134,15 +152,29 @@ public partial class MainWindow : Window
 
                 var levelNode = new LevelNode(levelName, null, null, null);
                 var levelItem = new TreeViewItem { Header = levelName, Tag = levelNode };
+                var levelDuplicates = duplicates.ForLevel(levelName);
+                if (levelDuplicates.Count > 0)
+                {
+                    duplicateLevels++;
+                    levelItem.Background = CompareWindow.DuplicateBrush;
+                    levelItem.ToolTip = DescribeLevelDuplicates(levelDuplicates) + "\nRight-click to compare.";
+                }
+                levelItem.ContextMenu = CreateCompareMenu(levelNode, levelDuplicates.Count > 0);
                 if (levelNode.Key == preferredKey) toSelect = levelItem;
                 foreach (var child in children)
                 {
+                    var conditionDuplicates = duplicates.ForCondition(child.Level, child.Group!, child.Condition!);
                     var childItem = new TreeViewItem
                     {
                         Header = child.Condition,
                         Tag = child,
-                        ToolTip = "Selector " + child.Selector + " of test-condition group " + child.Group,
+                        ToolTip = "Selector " + child.Selector + " of test-condition group " + child.Group
+                            + (conditionDuplicates.Count > 0
+                                ? "\nSame values as: " + string.Join(", ", conditionDuplicates.Select(other => other.Condition)) + "\nRight-click to compare."
+                                : string.Empty),
+                        ContextMenu = CreateCompareMenu(child, conditionDuplicates.Count > 0),
                     };
+                    if (conditionDuplicates.Count > 0) childItem.Background = CompareWindow.DuplicateBrush;
                     levelItem.Items.Add(childItem);
                     if (child.Key == preferredKey)
                     {
@@ -170,8 +202,163 @@ public partial class MainWindow : Window
         var summary = snapshot.CurrentDiagnostics.Count == 0
             ? snapshot.LastValidModel.LevelSets.Count + " level sets loaded"
             : snapshot.CurrentDiagnostics.Count + " diagnostic(s), first: " + snapshot.CurrentDiagnostics[0].Message;
-        SetStatus((editNote != null ? editNote + " " : string.Empty) + summary + (snapshot.IsDirty ? " (modified, not saved)" : string.Empty) + ". " + DescribeResolution(snapshot));
+        SetStatus((editNote != null ? editNote + " " : string.Empty) + summary + (snapshot.IsDirty ? " (modified, not saved)" : string.Empty) + ". " + resolutionSummary
+            + (filter.Length == 0 ? " Duplicates: " + duplicateLevels + " level sets produce the same values as another (highlighted)." : string.Empty));
         editNote = null;
+    }
+
+    private static string DescribeLevelDuplicates(IReadOnlyList<LevelDuplicate> levelDuplicates)
+    {
+        var lines = new List<string>();
+        void Add(LevelDuplicateRelation relation, string label)
+        {
+            var names = levelDuplicates.Where(item => item.Relation == relation).Select(item => item.OtherLevel).ToList();
+            if (names.Count > 0) lines.Add(label + string.Join(", ", names));
+        }
+
+        Add(LevelDuplicateRelation.Identical, "Same selectors and values as: ");
+        Add(LevelDuplicateRelation.ContainedIn, "All of its selectors exist with the same values in: ");
+        Add(LevelDuplicateRelation.Contains, "Also covers every selector of: ");
+        return string.Join("\n", lines);
+    }
+
+    private ContextMenu CreateCompareMenu(LevelNode node, bool hasDuplicates)
+    {
+        var item = new MenuItem { Header = hasDuplicates ? "Compare with duplicates..." : "No duplicates to compare", IsEnabled = hasDuplicates };
+        item.Click += (_, _) => ShowComparison(node);
+        var menu = new ContextMenu();
+        menu.Items.Add(item);
+        return menu;
+    }
+
+    private void ShowComparison(LevelNode node)
+    {
+        if (service == null) return;
+        var comparisons = BuildComparisons(node, service.Snapshot);
+        if (comparisons.Count == 0) return;
+        new CompareWindow(this, node.Condition ?? node.Level, comparisons).ShowDialog();
+    }
+
+    private List<Comparison> BuildComparisons(LevelNode node, PairedDocumentSnapshot snapshot)
+    {
+        var comparisons = new List<Comparison>();
+        if (node.IsSelector)
+        {
+            var left = new ConditionReference(node.Level, node.Group!, node.Condition!, node.Selector!);
+            foreach (var other in duplicates.ForCondition(node.Level, node.Group!, node.Condition!))
+            {
+                var right = other;
+                comparisons.Add(new Comparison(
+                    right.Condition + "  (level set " + right.Level + ", selector " + right.Selector + ")",
+                    left.Condition,
+                    right.Condition,
+                    () => CompareConditions(snapshot, left, right)));
+            }
+            return comparisons;
+        }
+
+        foreach (var duplicate in duplicates.ForLevel(node.Level))
+        {
+            var other = duplicate;
+            var relation = other.Relation switch
+            {
+                LevelDuplicateRelation.Identical => "same selectors and values",
+                LevelDuplicateRelation.ContainedIn => "has every selector of " + node.Level + ", and more",
+                _ => "all of its selectors are covered by " + node.Level,
+            };
+            comparisons.Add(new Comparison(
+                other.OtherLevel + "  (" + relation + "; " + other.SharedSelectors.Count + " shared selector(s))",
+                node.Level,
+                other.OtherLevel,
+                () =>
+                {
+                    var rows = new List<CompareRow>();
+                    foreach (var selector in other.SharedSelectors)
+                    {
+                        var left = FindCondition(snapshot, node.Level, selector);
+                        var right = FindCondition(snapshot, other.OtherLevel, selector);
+                        if (left != null && right != null) rows.AddRange(CompareConditions(snapshot, left, right));
+                    }
+                    return rows;
+                }));
+        }
+        return comparisons;
+    }
+
+    private static ConditionReference? FindCondition(PairedDocumentSnapshot snapshot, string level, string selector)
+    {
+        var linked = FindLevel(snapshot, level);
+        if (linked == null) return null;
+        foreach (var group in linked.Groups)
+        {
+            foreach (var condition in group.TestConditions)
+            {
+                if (string.Equals(condition.Selector, selector, StringComparison.Ordinal)) return new ConditionReference(level, group.Group.Name, condition.Name, selector);
+            }
+        }
+        return null;
+    }
+
+    /// <summary>Compares two test conditions cell by cell: the value each produces and how it is defined.</summary>
+    private List<CompareRow> CompareConditions(PairedDocumentSnapshot snapshot, ConditionReference left, ConditionReference right)
+    {
+        var rows = new List<CompareRow>();
+        var leftLevel = FindLevel(snapshot, left.Level);
+        var rightLevel = FindLevel(snapshot, right.Level);
+        if (leftLevel == null || rightLevel == null) return rows;
+        var leftTable = LevelTableProjector.Project(leftLevel);
+        var rightTable = LevelTableProjector.Project(rightLevel);
+        var leftGroup = FindGroup(leftTable, left.Group);
+        var rightGroup = FindGroup(rightTable, right.Group);
+        if (leftGroup == null || rightGroup == null) return rows;
+
+        var columns = leftTable.Columns.Concat(rightTable.Columns.Where(column => !leftTable.Columns.Contains(column))).ToList();
+        var selector = left.Selector == right.Selector ? left.Selector : left.Selector + " / " + right.Selector;
+        for (var index = 0; index < Math.Max(leftTable.Rows.Count, rightTable.Rows.Count); index++)
+        {
+            var leftRow = index < leftTable.Rows.Count ? leftTable.Rows[index] : null;
+            var rightRow = index < rightTable.Rows.Count ? rightTable.Rows[index] : null;
+            var resource = leftRow != null && rightRow != null && leftRow.Name != rightRow.Name
+                ? leftRow.Name + " / " + rightRow.Name
+                : (leftRow ?? rightRow)!.Name;
+            foreach (var column in columns)
+            {
+                var leftExpression = leftRow?.Cells.FirstOrDefault(cell => cell.Column == column)?.Value ?? string.Empty;
+                var rightExpression = rightRow?.Cells.FirstOrDefault(cell => cell.Column == column)?.Value ?? string.Empty;
+                if (leftExpression.Length == 0 && rightExpression.Length == 0) continue;
+
+                var (leftValue, leftHow) = Explain(leftExpression, column, leftGroup, left.Selector);
+                var (rightValue, rightHow) = Explain(rightExpression, column, rightGroup, right.Selector);
+                var defined = ParameterResolver.NormalizeValue(leftValue) != ParameterResolver.NormalizeValue(rightValue)
+                    ? CompareRow.ValuesDiffer
+                    : SameDefinition(leftHow, rightHow) ? CompareRow.SameWay : CompareRow.Differently;
+                rows.Add(new CompareRow(selector, resource, column, leftValue, rightValue, leftHow, rightHow, defined));
+            }
+        }
+        return rows;
+    }
+
+    /// <summary>
+    /// True when two definition chains use the same names and values. Where the selector sits in a value list
+    /// ("entry 1 of 4" against "entry 1 of 5") is not a difference in definition.
+    /// </summary>
+    private static bool SameDefinition(string leftHow, string rightHow)
+    {
+        const string pattern = @"\s*\[[^\]]*, entry \d+ of \d+\]";
+        return System.Text.RegularExpressions.Regex.Replace(leftHow, pattern, string.Empty)
+            == System.Text.RegularExpressions.Regex.Replace(rightHow, pattern, string.Empty);
+    }
+
+    /// <summary>The value of one cell for a selector, and the chain of definitions that leads to it.</summary>
+    private (string Value, string How) Explain(string expression, string column, LinkedTestConditionGroup group, string selector)
+    {
+        if (expression.Length == 0) return (string.Empty, string.Empty);
+        if (!ParameterResolver.IsParameterProperty(column)) return (expression, expression);
+        var resolved = resolver.Resolve(expression, group, selector);
+        var how = resolved.Changed || resolved.Problem != null
+            ? string.Join("  \u2192  ", new[] { resolved.Expression }.Concat(resolved.Steps))
+            : resolved.Text;
+        return (resolved.Problem != null ? ParameterResolver.UnresolvedPrefix + resolved.Problem : resolved.Text, how);
     }
 
     private string DescribeResolution(PairedDocumentSnapshot snapshot)
@@ -215,8 +402,11 @@ public partial class MainWindow : Window
             // A test condition is selected: every parameter is replaced by its value for that selector.
             // An edit is written to the definition that holds the value (the level or the specification set).
             records = LevelsRecordsExtractor.ExtractResolved(table, group, node.Selector!, resolver, snapshot.TestConditionsText, out unresolved);
+            var values = records.SelectMany(record => record.CellsData).Where(pair => pair.Key != LevelsRecordsExtractor.RowNameColumn && pair.Value.Data.Length > 0).ToList();
+            var editableValues = values.Count(pair => (pair.Value.CellOptions & 1) != 0);
             LevelTitle.Text = node.Level + "  \u2014  " + node.Condition + ": values for selector " + node.Selector
                 + " (specification set " + (group.SpecificationSet?.Name ?? group.Group.SpecificationSetName) + ")"
+                + "  \u2014  " + editableValues + " of " + values.Count + " values can be edited here; grey values are calculated or come from uservars (double-click one to see why)"
                 + (unresolved > 0 ? "  \u2014  " + unresolved + " value(s) not resolved" : string.Empty);
             shape = "resolved|";
         }
@@ -272,15 +462,75 @@ public partial class MainWindow : Window
                     if (problem != null)
                     {
                         // Torch's grid is read-only-edit, so a rejected edit simply keeps the old value.
+                        rejectedEdit = problem;
                         SetStatus(problem);
                         return;
                     }
                 }
                 break;
+            case "EditCommittedEvent":
+                if (pendingCommit != null && ReadString(gridEvent.Args, "Token") == pendingCommitToken) pendingCommit.TrySetResult(true);
+                break;
+            case "CellNotEditableEvent":
+                SetStatus(ExplainNotEditable(ReadString(gridEvent.Args, "RowId"), ReadString(gridEvent.Args, "ColumnName")));
+                break;
             case "ExceptionEvent":
                 SetStatus("Grid error: " + gridEvent.Args.GetRawText());
                 break;
         }
+    }
+
+    /// <summary>
+    /// Finishes a cell editor that is still open, as pressing Enter would, and waits until the typed value has
+    /// been applied. Returns false when that value was rejected, in which case the status bar says why.
+    /// </summary>
+    private async Task<bool> CommitPendingEditAsync()
+    {
+        if (!gridReady || bridge == null) return true;
+        var completion = new TaskCompletionSource<bool>();
+        var token = Guid.NewGuid().ToString("N");
+        pendingCommit = completion;
+        pendingCommitToken = token;
+        rejectedEdit = null;
+        try
+        {
+            await bridge.RunCommandAsync("CommitEditCommand", new { Token = token });
+            await Task.WhenAny(completion.Task, Task.Delay(3000));
+        }
+        catch (Exception exception)
+        {
+            SetStatus("The value being edited could not be applied: " + exception.Message);
+            return false;
+        }
+        finally
+        {
+            if (ReferenceEquals(pendingCommit, completion)) pendingCommit = null;
+        }
+
+        return rejectedEdit == null;
+    }
+
+    /// <summary>Why the double-clicked cell cannot be edited in the current view.</summary>
+    private string ExplainNotEditable(string? rowId, string? column)
+    {
+        const string prefix = "Not editable: ";
+        if (service == null || displayedNode == null || column == null) return prefix + "no level is displayed.";
+        if (column == LevelsRecordsExtractor.RowNameColumn) return prefix + "resource and sequence-break names are changed in the .lvl source.";
+        if (column.EndsWith(LevelsRecordsExtractor.UserVarColumnSuffix, StringComparison.Ordinal)) return prefix + "this column shows the uservar from UservarDefinitions.usrv; edit the clamp column next to it.";
+
+        var snapshot = service.Snapshot;
+        var linked = FindLevel(snapshot, displayedNode.Level);
+        if (linked == null) return prefix + "the level is no longer present.";
+        var table = LevelTableProjector.Project(linked);
+        if (!LevelsRecordsExtractor.TryParseRowId(rowId, out var rowIndex) || rowIndex >= table.Rows.Count) return prefix + "the row no longer exists.";
+        var cell = table.Rows[rowIndex].Cells.FirstOrDefault(candidate => string.Equals(candidate.Column, column, StringComparison.Ordinal));
+        if (cell == null || cell.Value.Length == 0) return prefix + "'" + column + "' is not set on " + table.Rows[rowIndex].Name + "; add it in the .lvl source first.";
+
+        var group = displayedNode.IsSelector ? FindGroup(table, displayedNode.Group) : null;
+        if (group == null) return prefix + "this value cannot be changed from the table.";
+        var target = new ParameterResolver(userVars).FindEditTarget(cell.Value, group, displayedNode.Selector!, snapshot.TestConditionsText);
+        return prefix + (target.Reason ?? "this value cannot be changed from the table.")
+            + " Select the level set '" + displayedNode.Level + "' in the tree to change which parameter this cell uses (" + cell.Value + ").";
     }
 
     /// <summary>Applies one grid edit to the .lvl text. Returns a message when the edit is rejected.</summary>
@@ -407,10 +657,13 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnLevelSelectionChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+    private async void OnLevelSelectionChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
         if (updatingTree || service == null) return;
         selectedNode = (LevelTree.SelectedItem as TreeViewItem)?.Tag as LevelNode;
+
+        // A cell editor may still be open on the table being left; apply it there before showing the new one.
+        await CommitPendingEditAsync();
         ShowSelectedNode(service.Snapshot);
     }
 
@@ -419,7 +672,18 @@ public partial class MainWindow : Window
         if (service != null) RefreshLevels(service.Snapshot);
     }
 
-    private void OnSaveClick(object sender, RoutedEventArgs e) => TrySave();
+    private async void OnSaveClick(object sender, RoutedEventArgs e) => await SaveAsync();
+
+    /// <summary>Applies a value that is still being typed, then saves. Nothing is saved if that value is rejected.</summary>
+    private async Task<bool> SaveAsync()
+    {
+        if (!await CommitPendingEditAsync())
+        {
+            SetStatus("Not saved. The value being edited was rejected: " + (rejectedEdit ?? StatusText.Text));
+            return false;
+        }
+        return TrySave();
+    }
 
     private bool TrySave()
     {
@@ -459,6 +723,15 @@ public partial class MainWindow : Window
 
     private void OnClosing(object? sender, CancelEventArgs e)
     {
+        if (!closeAfterCommit && gridReady && !selfTesting)
+        {
+            // A value may still be in an open cell editor. Apply it first, then come back here.
+            e.Cancel = true;
+            _ = CloseAfterCommitAsync();
+            return;
+        }
+        closeAfterCommit = false;
+
         if (service != null && service.Snapshot.IsDirty && !selfTesting)
         {
             var answer = MessageBox.Show(this, "Save changes to the levels files before closing?", Title, MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
@@ -470,6 +743,17 @@ public partial class MainWindow : Window
         }
 
         service?.Dispose();
+    }
+
+    private async Task CloseAfterCommitAsync()
+    {
+        if (!await CommitPendingEditAsync())
+        {
+            SetStatus("Not closed. The value being edited was rejected: " + (rejectedEdit ?? StatusText.Text) + " The cell keeps its old value; edit it again, or close again to leave it as it is.");
+            return;
+        }
+        closeAfterCommit = true;
+        Close();
     }
 
     private void SetStatus(string message) => StatusText.Text = message;
@@ -519,9 +803,12 @@ public partial class MainWindow : Window
                 const string script = "JSON.stringify({ renderedRows: document.querySelectorAll('#myGrid .ag-center-cols-container .ag-row').length, headerCells: document.querySelectorAll('#myGrid .ag-header-cell').length })";
                 var encoded = await bridge.EvaluateAsync(script);
                 report["grid"] = JsonSerializer.Deserialize<JsonElement>(JsonSerializer.Deserialize<string>(encoded) ?? "{}");
+                report["uiEdit"] = await RunUiEditAsync();
+                report["openEditor"] = await RunOpenEditorAsync();
                 report["editRoundTrip"] = await RunEditRoundTripAsync();
                 report["clamps"] = await RunClampCheckAsync();
                 report["parameters"] = await RunParameterCheckAsync();
+                report["duplicates"] = RunDuplicateCheck();
             }
         }
         catch (Exception exception)
@@ -547,6 +834,23 @@ public partial class MainWindow : Window
             + ") continue; var cells = rows[i].querySelectorAll('[col-id]'); for (var j = 0; j < cells.length; j++) { if (cells[j].getAttribute('col-id') === "
             + JsonSerializer.Serialize(column) + ") return cells[j].textContent; } } return null; })()";
         return JsonSerializer.Deserialize<string?>(await bridge!.EvaluateAsync(probe));
+    }
+
+    /// <summary>Double-clicks a cell, and if an editor opens, types a value and presses Enter. Returns what happened.</summary>
+    private async Task<string> UiEditAsync(int rowIndex, string column, string typed)
+    {
+        await ReadGridCellAsync(rowIndex, column); // Scrolls the cell into view.
+        var rowId = JsonSerializer.Serialize(LevelsRecordsExtractor.ToRowId(rowIndex));
+        var columnId = JsonSerializer.Serialize(column);
+        await bridge!.EvaluateAsync("import('../BaseComponents/Services/GridApiProvider.js').then(function (m) { window.__clvApi = m.default.getGridApi(); }); 0");
+        await Task.Delay(400);
+        var click = "(function () { var el = document.querySelector('#myGrid .ag-center-cols-container [row-id=' + JSON.stringify(" + rowId + ") + '] [col-id=' + JSON.stringify(" + columnId + ") + ']'); if (!el) { return 'cell not rendered'; } el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window })); el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window })); el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, view: window })); return 'double-clicked'; })()";
+        var clicked = JsonSerializer.Deserialize<string>(await bridge.EvaluateAsync(click));
+        await Task.Delay(700);
+        var type = "(function () { var input = document.querySelector('#myGrid .ag-cell-inline-editing input, #myGrid .ag-popup-editor input'); if (!input) { return 'no editor opened'; } Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, " + JsonSerializer.Serialize(typed) + "); input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true })); return 'editor opened, typed, Enter'; })()";
+        var typedResult = JsonSerializer.Deserialize<string>(await bridge.EvaluateAsync(type));
+        await Task.Delay(2000);
+        return clicked + "; " + typedResult;
     }
 
     private async Task PostCellEditAsync(int rowIndex, string column, string newValue)
@@ -587,7 +891,7 @@ public partial class MainWindow : Window
 
         if (fromUserVar != null)
         {
-            await PostCellEditAsync(fromUserVar.Value.Row, fromUserVar.Value.Cell.Column, "9.99A");
+            result["userVarUi"] = await UiEditAsync(fromUserVar.Value.Row, fromUserVar.Value.Cell.Column, "9.99A");
             result["userVarCell"] = table.Rows[fromUserVar.Value.Row].Name + " / " + fromUserVar.Value.Cell.Column;
             result["userVarEditRejectedWith"] = StatusText.Text;
             result["userVarEditChangedText"] = service.Snapshot.TestConditionsText != tcgOnDisk || service.Snapshot.LevelsText != levelsOnDisk;
@@ -605,7 +909,7 @@ public partial class MainWindow : Window
         var sent = "0.123" + unit;
         var otherBefore = otherCondition == null ? null : finder.Resolve(editCell.Value, group, otherCondition.Selector).Text;
 
-        await PostCellEditAsync(row, editCell.Column, sent);
+        result["ui"] = await UiEditAsync(row, editCell.Column, sent);
 
         var after = service.Snapshot;
         var edited = after.TestConditionsText;
@@ -639,6 +943,163 @@ public partial class MainWindow : Window
         else
         {
             service.ReloadFromDisk();
+        }
+        return result;
+    }
+
+    private Dictionary<string, object?> RunDuplicateCheck()
+    {
+        var result = new Dictionary<string, object?>();
+        if (service == null) return result;
+        service.ReloadFromDisk();
+        FilterBox.Text = string.Empty;
+        var snapshot = service.Snapshot;
+        var stopwatch = Stopwatch.StartNew();
+        var analysis = DuplicateAnalysis.Analyze(snapshot.LastValidModel, userVars);
+        stopwatch.Stop();
+        RefreshLevels(snapshot);
+
+        var levelItems = LevelTree.Items.OfType<TreeViewItem>().ToList();
+        result["analysisMilliseconds"] = stopwatch.ElapsedMilliseconds;
+        result["highlightedLevelSets"] = levelItems.Count(item => item.Background == CompareWindow.DuplicateBrush);
+        result["highlightedTestConditions"] = levelItems.SelectMany(item => item.Items.OfType<TreeViewItem>()).Count(item => item.Background == CompareWindow.DuplicateBrush);
+        result["identicalGroups"] = snapshot.LastValidModel.LevelSets
+            .Select(level => new[] { level.LevelSet.Name }.Concat(analysis.ForLevel(level.LevelSet.Name).Where(item => item.Relation == LevelDuplicateRelation.Identical).Select(item => item.OtherLevel)).OrderBy(name => name, StringComparer.Ordinal).ToList())
+            .Where(group => group.Count > 1)
+            .Select(group => string.Join(" = ", group))
+            .Distinct()
+            .ToList();
+        result["statusTail"] = StatusText.Text.Substring(Math.Max(0, StatusText.Text.Length - 110));
+
+        var node = new LevelNode("SBF_ARR", null, null, null);
+        var item = levelItems.FirstOrDefault(candidate => (candidate.Tag as LevelNode)?.Key == node.Key);
+        result["sbfArrToolTip"] = item?.ToolTip?.ToString()?.Replace("\n", "  |  ");
+        result["sbfArrMenu"] = (item?.ContextMenu?.Items[0] as MenuItem)?.Header?.ToString();
+        var comparisons = BuildComparisons(node, snapshot);
+        result["sbfArrComparisons"] = comparisons.Select(comparison => comparison.Title).ToList();
+        result["definedDifferentlyByComparison"] = comparisons.Select(comparison =>
+        {
+            var compared = comparison.Build();
+            return comparison.RightName + ": " + compared.Count(row => row.Defined == CompareRow.Differently) + " of " + compared.Count + " defined differently, " + compared.Count(row => row.Defined == CompareRow.ValuesDiffer) + " values differ";
+        }).ToList();
+        var withSbf = comparisons.FirstOrDefault(comparison => comparison.RightName == "SBF");
+        if (withSbf != null)
+        {
+            var rows = withSbf.Build();
+            result["sbfArrVsSbfRows"] = rows.Count;
+            result["sbfArrVsSbfDefinedDifferently"] = rows.Count(row => row.Defined == CompareRow.Differently);
+            result["sbfArrVsSbfValuesDiffer"] = rows.Count(row => row.Defined == CompareRow.ValuesDiffer);
+            var example = rows.FirstOrDefault(row => row.Defined == CompareRow.Differently);
+            if (example != null) result["exampleDifferentDefinition"] = example.Selector + " " + example.Resource + "/" + example.Property + ": " + example.LeftHow + "   VS   " + example.RightHow;
+        }
+
+        // Make sure the compare window can be built and shown.
+        var window = new CompareWindow(this, node.Level, comparisons);
+        window.Show();
+        window.Close();
+        result["compareWindowOpened"] = true;
+        return result;
+    }
+
+    /// <summary>
+    /// Edits a cell the way a person does: double-click the cell, type into the editor, press Enter.
+    /// Reports each stage so a failure shows where real editing stops.
+    /// </summary>
+    private async Task<Dictionary<string, object?>> RunUiEditAsync()
+    {
+        var result = new Dictionary<string, object?>();
+        var linked = service == null ? null : FindLevel(service.Snapshot, displayedNode?.Level);
+        if (service == null || bridge == null || linked == null) return result;
+
+        var table = LevelTableProjector.Project(linked);
+        for (var rowIndex = 0; rowIndex < table.Rows.Count; rowIndex++)
+        {
+            var cell = table.Rows[rowIndex].Cells.FirstOrDefault(candidate => candidate.EditableSpan.HasValue);
+            if (cell == null) continue;
+            var rowId = JsonSerializer.Serialize(LevelsRecordsExtractor.ToRowId(rowIndex));
+            var column = JsonSerializer.Serialize(cell.Column);
+            const string typed = "0.456";
+
+            await bridge.EvaluateAsync("import('../BaseComponents/Services/GridApiProvider.js').then(function (m) { window.__clvApi = m.default.getGridApi(); }); 0");
+            await Task.Delay(500);
+
+            var start = "(function () { var out = {}; try { var api = window.__clvApi; out.hasApi = !!api; var node = api.getRowNode(" + rowId + "); out.hasNode = !!node; var col = api.getColumn(" + column + "); out.hasColumn = !!col; out.columnEditable = col ? col.isCellEditable(node) : null; out.readOnlyEdit = api.getGridOption('readOnlyEdit'); var el = document.querySelector('#myGrid .ag-center-cols-container [row-id=' + JSON.stringify(" + rowId + ") + '] [col-id=' + JSON.stringify(" + column + ") + ']'); out.cellFound = !!el; if (el) { el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window })); el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window })); el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, view: window })); } } catch (e) { out.error = String(e); } return JSON.stringify(out); })()";
+            result["start"] = JsonSerializer.Deserialize<JsonElement>(JsonSerializer.Deserialize<string>(await bridge.EvaluateAsync(start)) ?? "{}");
+            await Task.Delay(700);
+
+            var type = "(function () { var out = {}; try { var api = window.__clvApi; out.editingCells = api.getEditingCells().length; var input = document.querySelector('#myGrid .ag-cell-inline-editing input, #myGrid .ag-popup-editor input'); out.editorFound = !!input; if (input) { out.editorInitialValue = input.value; Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, " + JsonSerializer.Serialize(typed) + "); input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true })); } } catch (e) { out.error = String(e); } return JSON.stringify(out); })()";
+            result["type"] = JsonSerializer.Deserialize<JsonElement>(JsonSerializer.Deserialize<string>(await bridge.EvaluateAsync(type)) ?? "{}");
+            await Task.Delay(1500);
+
+            result["cell"] = table.Rows[rowIndex].Name + " / " + cell.Column;
+            result["before"] = cell.Value;
+            result["typed"] = typed;
+            result["shownInGridAfter"] = await ReadGridCellAsync(rowIndex, cell.Column);
+            result["modelDirty"] = service.Snapshot.IsDirty;
+            result["status"] = StatusText.Text;
+            service.ReloadFromDisk();
+            await Task.Delay(800);
+            return result;
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Types into a cell and leaves the editor open (no Enter, no click elsewhere), then does what the Save
+    /// button does. In a normal self-test the value is only committed; with --selftest-save it is saved.
+    /// </summary>
+    private async Task<Dictionary<string, object?>> RunOpenEditorAsync()
+    {
+        var result = new Dictionary<string, object?>();
+        var linked = service == null ? null : FindLevel(service.Snapshot, displayedNode?.Level);
+        if (service == null || bridge == null || linked == null) return result;
+
+        var table = LevelTableProjector.Project(linked);
+        for (var rowIndex = 0; rowIndex < table.Rows.Count; rowIndex++)
+        {
+            var cell = table.Rows[rowIndex].Cells.FirstOrDefault(candidate => candidate.EditableSpan.HasValue);
+            if (cell == null) continue;
+            const string typed = "0.789";
+            var levelsOnDisk = File.ReadAllText(service.LevelsPath);
+
+            await ReadGridCellAsync(rowIndex, cell.Column);
+            var rowId = JsonSerializer.Serialize(LevelsRecordsExtractor.ToRowId(rowIndex));
+            var columnId = JsonSerializer.Serialize(cell.Column);
+            var open = "(function () { var el = document.querySelector('#myGrid .ag-center-cols-container [row-id=' + JSON.stringify(" + rowId + ") + '] [col-id=' + JSON.stringify(" + columnId + ") + ']'); if (!el) { return 'cell not rendered'; } el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, view: window })); return 'double-clicked'; })()";
+            result["open"] = JsonSerializer.Deserialize<string>(await bridge.EvaluateAsync(open));
+            await Task.Delay(700);
+            var type = "(function () { var input = document.querySelector('#myGrid .ag-cell-inline-editing input, #myGrid .ag-popup-editor input'); if (!input) { return 'no editor opened'; } Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, " + JsonSerializer.Serialize(typed) + "); input.dispatchEvent(new Event('input', { bubbles: true })); return 'typed, editor left open'; })()";
+            result["type"] = JsonSerializer.Deserialize<string>(await bridge.EvaluateAsync(type));
+            await Task.Delay(500);
+            result["appliedWhileEditorOpen"] = service.Snapshot.IsDirty;
+
+            if (selfTestSave)
+            {
+                result["saved"] = await SaveAsync();
+                var saved = File.ReadAllText(service.LevelsPath);
+                result["fileChangedOnDisk"] = saved != levelsOnDisk;
+                result["fileHasTypedValue"] = saved.Contains(cell.Column + " = " + typed + ";", StringComparison.Ordinal);
+                result["fileLengthChange"] = saved.Length - levelsOnDisk.Length;
+            }
+            else
+            {
+                result["committed"] = await CommitPendingEditAsync();
+            }
+
+            await Task.Delay(1000);
+            result["cell"] = table.Rows[rowIndex].Name + " / " + cell.Column;
+            result["before"] = cell.Value;
+            result["typed"] = typed;
+            result["appliedAfter"] = FindLevel(service.Snapshot, linked.LevelSet.Name) is { } after
+                && LevelTableProjector.Project(after).Rows[rowIndex].Cells.First(candidate => candidate.Column == cell.Column).Value == typed;
+            result["shownInGridAfter"] = await ReadGridCellAsync(rowIndex, cell.Column);
+            result["status"] = StatusText.Text.Substring(0, Math.Min(90, StatusText.Text.Length));
+            if (!selfTestSave)
+            {
+                service.ReloadFromDisk();
+                await Task.Delay(800);
+            }
+            return result;
         }
         return result;
     }

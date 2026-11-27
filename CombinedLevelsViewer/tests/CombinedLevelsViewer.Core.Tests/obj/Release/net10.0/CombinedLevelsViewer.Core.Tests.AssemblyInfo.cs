@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("CombinedLevelsViewer.Core.Tests")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a761e1edb9376258072c8eaaf935482085370ae9")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+827ae829ecd4f091e191f7062eb0966fcb8ae6e3")]
 [assembly: System.Reflection.AssemblyProductAttribute("CombinedLevelsViewer.Core.Tests")]
 [assembly: System.Reflection.AssemblyTitleAttribute("CombinedLevelsViewer.Core.Tests")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

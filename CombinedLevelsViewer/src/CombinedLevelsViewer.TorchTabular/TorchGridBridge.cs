@@ -56,7 +56,7 @@ internal sealed class TorchGridBridge
     public async Task InitializeAsync()
     {
         var userData = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CombinedLevelsViewer", "WebView2");
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Clive", "WebView2");
         var environment = await CoreWebView2Environment.CreateAsync(null, userData);
         await webView.EnsureCoreWebView2Async(environment);
 

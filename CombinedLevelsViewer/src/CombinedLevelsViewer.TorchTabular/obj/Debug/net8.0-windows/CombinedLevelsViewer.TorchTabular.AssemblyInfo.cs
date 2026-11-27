@@ -11,13 +11,14 @@
 using System;
 using System.Reflection;
 
-[assembly: System.Reflection.AssemblyCompanyAttribute("CombinedLevelsViewer.TorchTabular")]
+[assembly: System.Reflection.AssemblyCompanyAttribute("Clive")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
-[assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a761e1edb9376258072c8eaaf935482085370ae9")]
-[assembly: System.Reflection.AssemblyProductAttribute("CombinedLevelsViewer.TorchTabular")]
-[assembly: System.Reflection.AssemblyTitleAttribute("CombinedLevelsViewer.TorchTabular")]
-[assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
+[assembly: System.Reflection.AssemblyDescriptionAttribute("Clive - Combined Levels Viewer")]
+[assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.1.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.1+827ae829ecd4f091e191f7062eb0966fcb8ae6e3")]
+[assembly: System.Reflection.AssemblyProductAttribute("Clive")]
+[assembly: System.Reflection.AssemblyTitleAttribute("Clive")]
+[assembly: System.Reflection.AssemblyVersionAttribute("1.0.1.0")]
 [assembly: System.Runtime.Versioning.TargetPlatformAttribute("Windows7.0")]
 [assembly: System.Runtime.Versioning.SupportedOSPlatformAttribute("Windows7.0")]
 

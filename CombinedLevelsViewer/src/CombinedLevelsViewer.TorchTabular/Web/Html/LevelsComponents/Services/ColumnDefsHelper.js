@@ -35,6 +35,10 @@ class ColumnDefsHelper extends ColumnDefsHelperBase {
         if (cellData !== undefined && IsOptionEnabled(cellData.CellOptions, LevelsCellOptions.Invalid)) {
             return { color: "#c62828", fontWeight: "bold" };
         }
+        // Values that cannot be edited in this view (calculated, from a uservar, or not set) are greyed.
+        if (params.colDef.field !== LevelsConsts.RowNameColumn && !this.isEditable(params)) {
+            return { color: "#8a8a8a", fontWeight: "" };
+        }
         return { color: "", fontWeight: "" };
     };
 
